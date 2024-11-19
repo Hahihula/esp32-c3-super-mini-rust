@@ -1,0 +1,3 @@
+[toolchain]
+channel = "1.84.0-aarch64-apple-darwin"
+components = ["rust-src"]
