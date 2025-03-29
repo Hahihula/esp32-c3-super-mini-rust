@@ -12,9 +12,10 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
+    gpio::Level,
     rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
     rng::Rng,
-    time::RateExtU32,
+    time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -32,14 +33,14 @@ fn create_led_bits(r: u8, g: u8, b: u8, w: u8) -> [u32; 33] {
     for byte in bytes {
         for bit in (0..8).rev() {
             data[idx] = if (byte & (1 << bit)) != 0 {
-                PulseCode::new(true, T1H, false, T1L)
+                PulseCode::new(Level::High, T1H, Level::Low, T1L)
             } else {
-                PulseCode::new(true, T0H, false, T0L)
+                PulseCode::new(Level::High, T0H, Level::Low, T0L)
             };
             idx += 1;
         }
     }
-    data[32] = PulseCode::new(false, 800, false, 0);
+    data[32] = PulseCode::new(Level::Low, 800, Level::Low, 0);
     data
 }
 
@@ -49,17 +50,15 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let freq = 80.MHz();
+    let freq = Rate::from_mhz(80);
+
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
 
     let mut channel = rmt
         .channel0
         .configure(
             peripherals.GPIO4,
-            TxChannelConfig {
-                clk_divider: 1,
-                ..TxChannelConfig::default()
-            },
+            TxChannelConfig::default().with_clk_divider(1),
         )
         .unwrap();
 
@@ -78,7 +77,7 @@ async fn main(_spawner: Spawner) {
         //     let data = create_led_bits(r, g, b, w);
         //     channel.transmit(&data).await.unwrap();
         // }
-        for i in 0..144 {
+        for i in 0..5 {
             let r = rng.random() % 5;
             let g = rng.random() % 5;
             let b = rng.random() % 5;

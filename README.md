@@ -1,6 +1,10 @@
 # esp32-c3-super-mini board
 
+![svg of the board](wokwi_board/board.svg)
+
 inspired by this great repository -> https://github.com/sidharthmohannair/Tutorial-ESP32-C3-Super-Mini
+
+<img src="https://github.com/sidharthmohannair/Tutorial-ESP32-C3-Super-Mini/blob/main/images/pinout%20ESP32_supermini.jpg?raw=true" alt="board pinout" height="250">
 
 You can find most of the information about the board there. Here I just want to stash some basic RUST examples compatible with esp_hal v0.23.1
 
@@ -19,8 +23,15 @@ You can also copy the .cargo/config.toml and build.rs files from this repository
 - [blink](examples/blink.rs)
   `cargo espflash flash --release --example blink`
 
-- [snow](examples/sk6812_rgbw_embassy.rs)
+- [sk6812 led strip](examples/sk6812_rgbw_embassy.rs)
   `cargo espflash flash --release --example sk6812_rgbw_embassy`
+
+## Simulate
+
+There is the [wokwi simulator](https://wokwi.com/) and in the wokwi_board folder is custom board for it, so you can test your code without touching the real board. You just need:
+
+  * Create a new [project on wokwi](https://wokwi.com/projects/new/rust-nostd-esp32-c3)
+  * Click inside the code editor, press "F1" and choose "Load custom board file..."
 
 ## More compehersive 'Getting Started' (if you do not even have rust installed)
 
@@ -39,30 +50,26 @@ rustup target add riscv32imc-unknown-none-elf
 Install ESPFlash using Cargo
 
 ```bash
-cargo install espflash
+cargo install cargo-espflash
 ```
 
 Verify Installation
 
 ```bash
-espflash --version
+cargo espflash --version
 ```
 
-### Step 4: Instal ESP-IDF
-
-You can get the new and shiny installer from [dl.espressif.com](https://dl.espressif.com/dl/eim/). You can choose CLI or GUI and just follow the step by step instructions.
-
-### Step 5: Clone the esp32-c3-super-mini-rust repository
+### Step 4: Clone the esp32-c3-super-mini-rust repository
 
 ```bash
 git clone https://github.com/hahihula/esp32-c3-super-mini-rust.git
 ```
 
-### Step 6: Connect the Board
+### Step 5: Connect the Board
 
 Connect the board to your computer using a USB-c cable.
 
-### Step 7: Build and Flash the Blink Example
+### Step 6: Build and Flash the Blink Example
 
 ```bash
 cd esp32-c3-super-mini-rust
@@ -70,7 +77,7 @@ cargo build --release --example blink
 cargo espflash flash --release --example blink
 ```
 
-### Step 8: Monitor the Serial Output
+### Step 7: Monitor the Serial Output
 
 ```bash
 cargo espflash monitor

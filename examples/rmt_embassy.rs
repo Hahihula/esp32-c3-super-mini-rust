@@ -15,8 +15,9 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
+    gpio::Level,
     rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
-    time::RateExtU32,
+    time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -29,7 +30,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let freq = 80.MHz();
+    let freq = Rate::from_mhz(80);
 
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
 
@@ -37,16 +38,13 @@ async fn main(_spawner: Spawner) {
         .channel0
         .configure(
             peripherals.GPIO4,
-            TxChannelConfig {
-                clk_divider: 255,
-                ..TxChannelConfig::default()
-            },
+            TxChannelConfig::default().with_clk_divider(255),
         )
         .unwrap();
 
-    let mut data = [PulseCode::new(true, 200, false, 50); 20];
+    let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 
-    data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+    data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
     data[data.len() - 1] = PulseCode::empty();
 
     loop {
