@@ -4,6 +4,8 @@
 
 inspired by this great repository -> https://github.com/sidharthmohannair/Tutorial-ESP32-C3-Super-Mini
 
+<img src="https://github.com/sidharthmohannair/Tutorial-ESP32-C3-Super-Mini/blob/main/images/pinout%20ESP32_supermini.jpg?raw=true" alt="board pinout" height="250">
+
 You can find most of the information about the board there. Here I just want to stash some basic RUST examples compatible with esp_hal v0.23.1
 
 You can also copy the .cargo/config.toml and build.rs files from this repository if you just want to build some rust code for the board.
@@ -21,7 +23,7 @@ You can also copy the .cargo/config.toml and build.rs files from this repository
 - [blink](examples/blink.rs)
   `cargo espflash flash --release --example blink`
 
-- [snow](examples/sk6812_rgbw_embassy.rs)
+- [sk6812 led strip](examples/sk6812_rgbw_embassy.rs)
   `cargo espflash flash --release --example sk6812_rgbw_embassy`
 
 ## Simulate
