@@ -1,5 +1,6 @@
 [package]
 name = "esp32-c3-super-mini-rust"
+authors = ["Petr Gadorek <hahihula@gmail.com>"] 
 version = "0.1.0"
 edition = "2021"
 
