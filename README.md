@@ -39,13 +39,13 @@ rustup target add riscv32imc-unknown-none-elf
 Install ESPFlash using Cargo
 
 ```bash
-cargo install espflash
+cargo install cargo-espflash
 ```
 
 Verify Installation
 
 ```bash
-espflash --version
+cargo espflash --version
 ```
 
 ### Step 4: Instal ESP-IDF
