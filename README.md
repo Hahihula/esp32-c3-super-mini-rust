@@ -29,6 +29,9 @@ You can also copy the .cargo/config.toml and build.rs files from this repository
 - [neopixel (ws2812b) led strip](examples/neopixel_ws2812b_embassy)
   `cargo espflash flash --release --example neopixel_ws2812b_embassy`
 
+- [button](examples/neopixel_ws2812b_embassy)
+  `cargo espflash flash --release --example button`
+
 ## Simulate
 
 There is the [wokwi simulator](https://wokwi.com/) and in the wokwi_board folder is custom board for it, so you can test your code without touching the real board. You just need:
