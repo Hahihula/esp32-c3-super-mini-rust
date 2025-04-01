@@ -349,6 +349,24 @@ fn handler() {
     });
 }
 
+fn create_range(a: bool) -> [usize; BOARD_HEIGHT] {
+    let mut range: [usize; BOARD_HEIGHT] = [0; BOARD_HEIGHT];
+
+    if a {
+        // Range from 0 to BOARD_HEIGHT - 1
+        for i in 0..BOARD_HEIGHT {
+            range[i] = i;
+        }
+    } else {
+        // Range from BOARD_HEIGHT - 1 to 0
+        for i in 0..BOARD_HEIGHT {
+            range[i] = BOARD_HEIGHT - 1 - i;
+        }
+    }
+
+    range
+}
+
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -434,8 +452,9 @@ async fn main(_spawner: Spawner) {
         }
 
         // Draw game
-        for y in 0..BOARD_HEIGHT {
-            for x in 0..BOARD_WIDTH {
+        for x in 0..BOARD_WIDTH {
+            let range = create_range(x % 2 == 1);
+            for y in range {
                 if let Some(color) = game.board[y][x] {
                     let (r, g, b) = color_to_rgb(color);
                     let led_bits = create_led_bits(r, g, b, 0);
