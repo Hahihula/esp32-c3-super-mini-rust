@@ -5,7 +5,7 @@
 //! - RIGHT_BUTTON => GPIO0 -> GND
 //! - MIDDLE_BUTTON => GPIO1 -> GND
 //! - LEFT_BUTTON => GPIO2 -> GND
-//! - LED_STRIP_DATA => GPIO4
+//! - SPI => GPIO4, GPIO6, GPIO7
 //!
 //! Use Monitor to see on the output why is button debouncing important.
 
@@ -17,26 +17,75 @@ use core::fmt;
 use critical_section::Mutex;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
+use embedded_hal_async::spi::SpiBus;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    dma::{DmaRxBuf, DmaTxBuf},
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     handler, main,
     rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
     rng::Rng,
+    spi::{
+        master::{Config, Spi, SpiDmaBus},
+        Mode,
+    },
     time::{self, Rate},
+    Async,
 };
 use esp_println::println;
 
 // global config
-const BOARD_WIDTH: usize = 10;
-const BOARD_HEIGHT: usize = 20;
+const BOARD_WIDTH: usize = 8;
+const BOARD_HEIGHT: usize = 32;
 const FALL_INTERVAL: u64 = 500; // TODO: should be function of score -> higher score faster speed
 const BRIGHTNESS: u8 = 6;
 const T0H: u16 = 40;
 const T0L: u16 = 85;
 const T1H: u16 = 80;
 const T1L: u16 = 45;
+
+struct Max7219 {
+    spi: SpiDmaBus<'static, Async>,
+}
+
+impl Max7219 {
+    fn new(spi: SpiDmaBus<'static, Async>) -> Self {
+        Max7219 { spi }
+    }
+
+    async fn init(&mut self) {
+        // Initialize four MAX7219 modules
+        for addr in 1..=4 {
+            self.write_reg(addr, 0x09, 0x00).await; // No decode
+            self.write_reg(addr, 0x0A, 0x01).await; // Low intensity
+            self.write_reg(addr, 0x0B, 0x07).await; // Scan all 8 digits
+            self.write_reg(addr, 0x0C, 0x01).await; // Normal operation
+            self.write_reg(addr, 0x0F, 0x00).await; // Display test off
+        }
+    }
+
+    async fn write_reg(&mut self, addr: u8, reg: u8, data: u8) {
+        // Send 8 bytes (4 modules * 2 bytes), with NOP (0x00, 0x00) for others
+        let mut buffer = [0u8; 8];
+        let idx = (4 - addr) as usize * 2;
+        buffer[idx] = reg;
+        buffer[idx + 1] = data;
+        self.spi.write(&buffer).expect("SPI write failed");
+    }
+
+    async fn set_row(&mut self, addr: u8, row: u8, value: u8) {
+        self.write_reg(addr, row + 1, value).await;
+    }
+
+    async fn clear(&mut self) {
+        for addr in 1..=4 {
+            for row in 0..8 {
+                self.set_row(addr, row, 0x00).await;
+            }
+        }
+    }
+}
 
 fn create_led_bits(r: u8, g: u8, b: u8, w: u8) -> [u32; 33] {
     let mut data = [PulseCode::empty(); 33];
@@ -138,7 +187,7 @@ impl Tetris {
         let mut game = Tetris {
             board: [[None; BOARD_WIDTH]; BOARD_HEIGHT],
             current_piece: TETROMINOS[0].clone(),
-            piece_pos: (3, 0),
+            piece_pos: (2, 0),
             score: 0,
             game_over: false,
             ran: rng,
@@ -369,6 +418,7 @@ fn create_range(a: bool) -> [usize; BOARD_HEIGHT] {
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
+    println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let out_config = OutputConfig::default();
@@ -377,6 +427,37 @@ async fn main(_spawner: Spawner) {
     let mut right_button = Input::new(peripherals.GPIO0, in_config);
     let mut middle_button = Input::new(peripherals.GPIO1, in_config);
     let mut left_button = Input::new(peripherals.GPIO2, in_config);
+
+    // SPI setup for MAX7219
+    let sclk = peripherals.GPIO4;
+    let mosi = peripherals.GPIO6;
+    let cs = peripherals.GPIO7;
+
+    let dma_channel = peripherals.DMA_CH0;
+
+    // DMA buffers
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = esp_hal::dma_buffers!(32);
+    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+    let mut spi = Spi::new(
+        peripherals.SPI2,
+        Config::default()
+            .with_frequency(Rate::from_mhz(10))
+            .with_mode(Mode::_0),
+    )
+    .unwrap()
+    .with_sck(sclk)
+    .with_mosi(mosi)
+    .with_cs(cs)
+    .with_dma(dma_channel)
+    .with_buffers(dma_rx_buf, dma_tx_buf)
+    .into_async();
+
+    // Initialize MAX7219
+    let mut max7219 = Max7219::new(spi);
+    max7219.init().await;
+    max7219.clear().await;
 
     // let mut io = Io::new(peripherals.IO_MUX);
     // io.set_interrupt_handler(handler);
@@ -394,32 +475,19 @@ async fn main(_spawner: Spawner) {
 
     // TODO: controll using interupts
 
-    let freq = Rate::from_mhz(80);
-    let delay = Delay::new();
-    let mut rng = Rng::new(peripherals.RNG);
-    let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
-    let mut channel = match rmt.channel0.configure(
-        peripherals.GPIO4,
-        TxChannelConfig::default().with_clk_divider(1),
-    ) {
-        Ok(channel) => channel,
-        Err(err) => {
-            panic!(
-                "Failed to configure RMT channel for led controll: {:?}",
-                err
-            );
-        }
-    };
+    let rng = Rng::new(peripherals.RNG);
 
+    println!("Seting up game...");
     let mut game = Tetris::new(rng);
-    // let mut writer = TerminalWriter::new(); TODO: Add writer
+
     let mut last_update = time::Instant::now();
     let fall_interval = time::Duration::from_millis(FALL_INTERVAL);
 
     // Debouncing TODO: implement in inmterupt handlers
     let mut last_key_time = time::Instant::now();
-    let debounce_duration = time::Duration::from_millis(100); // 100ms debounce
+    let debounce_duration = time::Duration::from_millis(250); // 100ms debounce
 
+    println!("Starting game loop...");
     // Game loop
     'game_loop: loop {
         // Handle timing
@@ -451,36 +519,41 @@ async fn main(_spawner: Spawner) {
             }
         }
 
-        // Draw game
-        for x in 0..BOARD_WIDTH {
-            let range = create_range(x % 2 == 1);
-            for y in range {
-                if let Some(color) = game.board[y][x] {
-                    let (r, g, b) = color_to_rgb(color);
-                    let led_bits = create_led_bits(r, g, b, 0);
-                    match channel.transmit(&led_bits).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            println!("Error transmitting data to LED: {:?}", err);
-                        }
-                    }
-                }
-                if !game.game_over {
-                    for &(dx, dy) in &game.current_piece.shape {
-                        if (game.piece_pos.0 + dx as i8) as usize == x
-                            && (game.piece_pos.1 + dy as i8) as usize == y
-                        {
-                            let (r, g, b) = color_to_rgb(game.current_piece.color);
-                            let led_bits = create_led_bits(r, g, b, 0);
-                            match channel.transmit(&led_bits).await {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    println!("Error transmitting data to LED: {:?}", err);
-                                }
+        // Draw game on MAX7219
+        max7219.clear().await;
+        for module in 0..4 {
+            let y_start = module * 8; // Board rows: 0-7, 8-15, 16-23, 24-31
+
+            let mut column_data = [0u8; 8]; // Pre-calculate all column data for this module
+
+            // Collect data for all 8 columns in this module
+            for board_y in y_start..(y_start + 8) {
+                let local_y = board_y - y_start; // Local row within this module (0-7)
+
+                for board_x in 0..BOARD_WIDTH {
+                    let mut occupied = game.board[board_y][board_x].is_some();
+                    if !game.game_over {
+                        for &(dx, dy) in &game.current_piece.shape {
+                            if (game.piece_pos.0 + dx as i8) as usize == board_x
+                                && (game.piece_pos.1 + dy as i8) as usize == board_y
+                            {
+                                occupied = true;
                             }
                         }
                     }
+                    if occupied {
+                        // For 90 degree rotation: x becomes y, y becomes 7-x
+                        // Set the bit in the appropriate column
+                        column_data[board_x] |= 1 << (7 - local_y);
+                    }
                 }
+            }
+
+            // Now send each column as a row to the MAX7219
+            for col in 0..8 {
+                max7219
+                    .set_row(4 - module as u8, col as u8, column_data[col])
+                    .await;
             }
         }
 

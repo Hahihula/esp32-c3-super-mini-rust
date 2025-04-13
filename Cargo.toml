@@ -24,4 +24,5 @@ embassy-time              = { version = "0.4.0" }
 embassy-time-driver       = { version = "0.2.0", features = [ "tick-hz-1_000_000" ] }
 embassy-time-queue-utils  = { version = "0.1.0", features = ["_generic-queue"] }
 smoltcp = { version = "0.12.0", default-features=false, features = [ "proto-ipv4", "socket-tcp", "socket-icmp", "socket-udp", "medium-ethernet", "proto-dhcpv4", "socket-raw", "socket-dhcpv4"] }
+embedded-hal-async = "1.0.0"
 

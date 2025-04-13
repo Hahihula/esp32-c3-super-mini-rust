@@ -598,6 +598,7 @@ dependencies = [
  "embassy-time-driver",
  "embassy-time-queue-utils",
  "embedded-graphics",
+ "embedded-hal-async",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
