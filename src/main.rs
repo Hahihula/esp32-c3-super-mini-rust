@@ -12,21 +12,21 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
-use core::fmt;
-use critical_section::Mutex;
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    delay::Delay,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
-    handler, main,
     rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
     rng::Rng,
     time::{self, Rate},
 };
 use esp_println::println;
+
+impl RandomGenerator for Rng {
+    fn next_random(&mut self) -> usize {
+        self.random() as usize
+    }
+}
 
 // global config
 const BOARD_WIDTH: usize = 10;
@@ -271,84 +271,6 @@ impl Tetris {
     }
 }
 
-// Separate drawing function
-pub fn draw_on_screen(tetris: &Tetris, f: &mut impl fmt::Write) -> fmt::Result {
-    for y in 0..BOARD_HEIGHT {
-        write!(f, "|")?;
-        for x in 0..BOARD_WIDTH {
-            let mut occupied = tetris.board[y][x].is_some();
-            if !tetris.game_over {
-                for &(dx, dy) in &tetris.current_piece.shape {
-                    if (tetris.piece_pos.0 + dx as i8) as usize == x
-                        && (tetris.piece_pos.1 + dy as i8) as usize == y
-                    {
-                        occupied = true;
-                    }
-                }
-            }
-            write!(f, "{}", if occupied { "#" } else { " " })?;
-        }
-        writeln!(f, "|")?;
-    }
-    if tetris.game_over {
-        writeln!(f, "GAME OVER - Score: {}", tetris.score)
-    } else {
-        writeln!(f, "Score: {}", tetris.score)
-    }
-}
-
-// global mutable state for button and LED
-static RIGHT_BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
-static MIDDLE_BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
-static LEFT_BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
-
-static LED_STATE: Mutex<RefCell<bool>> = Mutex::new(RefCell::new(true));
-
-#[handler]
-fn handler() {
-    critical_section::with(|cs| {
-        let mut right_button = RIGHT_BUTTON.borrow_ref_mut(cs);
-        let mut middle_button = MIDDLE_BUTTON.borrow_ref_mut(cs);
-        let mut left_button = LEFT_BUTTON.borrow_ref_mut(cs);
-        let mut led_state = LED_STATE.borrow_ref_mut(cs);
-        let Some(right_button) = right_button.as_mut() else {
-            // Some other interrupt has occurred
-            // before the right_button was set up.
-            return;
-        };
-        let Some(middle_button) = middle_button.as_mut() else {
-            return;
-        };
-        let Some(left_button) = left_button.as_mut() else {
-            return;
-        };
-        if right_button.is_interrupt_set() {
-            println!("right_button pressed");
-            if *led_state {
-                *led_state = false;
-            } else {
-                *led_state = true;
-            }
-        }
-        if middle_button.is_interrupt_set() {
-            println!("middle_button pressed");
-            if *led_state {
-                *led_state = false;
-            } else {
-                *led_state = true;
-            }
-        }
-        if left_button.is_interrupt_set() {
-            println!("left_button pressed");
-            if *led_state {
-                *led_state = false;
-            } else {
-                *led_state = true;
-            }
-        }
-    });
-}
-
 fn create_range(a: bool) -> [usize; BOARD_HEIGHT] {
     let mut range: [usize; BOARD_HEIGHT] = [0; BOARD_HEIGHT];
 
@@ -372,31 +294,14 @@ async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let out_config = OutputConfig::default();
-    let mut led = Output::new(peripherals.GPIO8, Level::High, out_config);
+    let led = Output::new(peripherals.GPIO8, Level::High, out_config);
     let in_config = InputConfig::default().with_pull(Pull::Up); // Use pull-up resistor for button
-    let mut right_button = Input::new(peripherals.GPIO0, in_config);
-    let mut middle_button = Input::new(peripherals.GPIO1, in_config);
-    let mut left_button = Input::new(peripherals.GPIO2, in_config);
-
-    // let mut io = Io::new(peripherals.IO_MUX);
-    // io.set_interrupt_handler(handler);
-
-    // critical_section::with(|cs| {
-    //     LED_STATE.borrow_ref_mut(cs);
-    //     right_button.listen(Event::FallingEdge);
-    //     middle_button.listen(Event::FallingEdge);
-    //     left_button.listen(Event::FallingEdge);
-
-    //     RIGHT_BUTTON.borrow_ref_mut(cs).replace(right_button);
-    //     MIDDLE_BUTTON.borrow_ref_mut(cs).replace(middle_button);
-    //     LEFT_BUTTON.borrow_ref_mut(cs).replace(left_button);
-    // });
-
-    // TODO: controll using interupts
+    let right_button = Input::new(peripherals.GPIO0, in_config);
+    let middle_button = Input::new(peripherals.GPIO1, in_config);
+    let left_button = Input::new(peripherals.GPIO2, in_config);
 
     let freq = Rate::from_mhz(80);
-    let delay = Delay::new();
-    let mut rng = Rng::new(peripherals.RNG);
+    let rng = Rng::new(peripherals.RNG);
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
     let mut channel = match rmt.channel0.configure(
         peripherals.GPIO4,
@@ -412,11 +317,9 @@ async fn main(_spawner: Spawner) {
     };
 
     let mut game = Tetris::new(rng);
-    // let mut writer = TerminalWriter::new(); TODO: Add writer
     let mut last_update = time::Instant::now();
     let fall_interval = time::Duration::from_millis(FALL_INTERVAL);
 
-    // Debouncing TODO: implement in inmterupt handlers
     let mut last_key_time = time::Instant::now();
     let debounce_duration = time::Duration::from_millis(100); // 100ms debounce
 
