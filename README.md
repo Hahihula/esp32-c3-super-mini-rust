@@ -35,6 +35,9 @@ You can also copy the .cargo/config.toml and build.rs files from this repository
 - [interrupt](examples/interrupt.rs)
   `cargo espflash flash --release --example interrupt`
 
+- [aht20](examples/aht20.rs)
+  `cargo espflash flash --release --example aht20`
+
 ## Simulate
 
 There is the [wokwi simulator](https://wokwi.com/) and in the wokwi_board folder is custom board for it, so you can test your code without touching the real board. You just need:
