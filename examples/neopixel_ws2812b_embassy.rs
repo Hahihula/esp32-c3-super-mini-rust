@@ -67,10 +67,10 @@ async fn main(_spawner: Spawner) {
 
     loop {
         println!("Settings LED colors:");
-        for i in 0..5 {
-            let r = rng.random() % 5;
-            let g = rng.random() % 5;
-            let b = rng.random() % 5;
+        for i in 0..200 {
+            let r = rng.random() % 255;
+            let g = rng.random() % 255;
+            let b = rng.random() % 255;
 
             // No white channel for WS2812B
             let data = create_led_bits(r as u8, g as u8, b as u8);
