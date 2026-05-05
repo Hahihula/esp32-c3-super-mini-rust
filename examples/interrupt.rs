@@ -9,6 +9,8 @@
 #![no_std]
 #![no_main]
 
+use core::cell::RefCell;
+use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
@@ -16,9 +18,6 @@ use esp_hal::{
     handler, main,
 };
 use esp_println::println;
-
-use core::cell::RefCell;
-use critical_section::Mutex;
 
 // global mutable state for button and LED
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));

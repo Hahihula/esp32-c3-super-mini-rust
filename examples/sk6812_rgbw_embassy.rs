@@ -13,12 +13,14 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Level,
-    rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
+    rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreator},
     rng::Rng,
     time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const T0H: u16 = 40;
 const T0L: u16 = 85;
@@ -56,7 +58,7 @@ async fn main(_spawner: Spawner) {
 
     let mut channel = rmt
         .channel0
-        .configure(
+        .configure_tx(
             peripherals.GPIO4,
             TxChannelConfig::default().with_clk_divider(1),
         )
@@ -77,7 +79,7 @@ async fn main(_spawner: Spawner) {
         //     let data = create_led_bits(r, g, b, w);
         //     channel.transmit(&data).await.unwrap();
         // }
-        for i in 0..5 {
+        for _ in 0..5 {
             let r = rng.random() % 5;
             let g = rng.random() % 5;
             let b = rng.random() % 5;
