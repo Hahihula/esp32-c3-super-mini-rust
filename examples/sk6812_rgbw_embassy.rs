@@ -13,7 +13,8 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Level,
-    rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreator},
+    interrupt::software::SoftwareInterruptControl,
+    rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
     rng::Rng,
     time::Rate,
     timer::timg::TimerGroup,
@@ -27,8 +28,8 @@ const T0L: u16 = 85;
 const T1H: u16 = 80;
 const T1L: u16 = 45;
 
-fn create_led_bits(r: u8, g: u8, b: u8, w: u8) -> [u32; 33] {
-    let mut data = [PulseCode::empty(); 33];
+fn create_led_bits(r: u8, g: u8, b: u8, w: u8) -> [PulseCode; 33] {
+    let mut data = [PulseCode::default(); 33];
     let bytes = [g, r, b, w];
 
     let mut idx = 0;
@@ -46,11 +47,13 @@ fn create_led_bits(r: u8, g: u8, b: u8, w: u8) -> [u32; 33] {
     data
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let freq = Rate::from_mhz(80);
 
@@ -58,32 +61,19 @@ async fn main(_spawner: Spawner) {
 
     let mut channel = rmt
         .channel0
-        .configure_tx(
-            peripherals.GPIO4,
-            TxChannelConfig::default().with_clk_divider(1),
-        )
-        .unwrap();
+        .configure_tx(&TxChannelConfig::default().with_clk_divider(1))
+        .unwrap()
+        .with_pin(peripherals.GPIO4);
 
-    let mut rng = Rng::new(peripherals.RNG);
-
-    // let led_colors = [
-    //     (5, 0, 0, 0),    // Red
-    //     (0, 5, 0, 0),    // Green
-    //     (0, 0, 5, 0),    // Blue
-    //     (0, 0, 0, 5),    // White
-    // ];
+    let mut rng = Rng::new();
 
     loop {
         println!("Settings LED colors:");
-        // for &(r, g, b, w) in led_colors.iter() {
-        //     let data = create_led_bits(r, g, b, w);
-        //     channel.transmit(&data).await.unwrap();
-        // }
         for _ in 0..5 {
             let r = rng.random() % 5;
             let g = rng.random() % 5;
             let b = rng.random() % 5;
-            let w = 0; // turn off white
+            let w = 0;
 
             let data = create_led_bits(r as u8, g as u8, b as u8, w as u8);
             channel.transmit(&data).await.unwrap();
