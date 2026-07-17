@@ -41,6 +41,11 @@ You can also copy the .cargo/config.toml and build.rs files from this repository
 - [bmp280_aht20_board](examples/bmp280_aht20_board.rs)
   `cargo espflash flash --release --example bmp280_aht20_board`
 
+- [gc9a01_display](examples/gc9a01_display.rs) — 1.28" 240x240 round GC9A01 LCD over SPI with `embedded-graphics` drawing primitives (circles, crosshairs, text, rectangles).
+  `cargo espflash flash --release --example gc9a01_display`
+
+  Wiring: SCK=GPIO6, MOSI=GPIO7, RST=GPIO10, DC=GPIO2, CS=GPIO3, BLK=GPIO4.
+
 ## Simulate
 
 There is the [wokwi simulator](https://wokwi.com/) and in the wokwi_board folder is custom board for it, so you can test your code without touching the real board. You just need:

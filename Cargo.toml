@@ -19,3 +19,9 @@ embassy-time-driver       = { version = "0.2", features = [ "tick-hz-1_000_000" 
 smoltcp = { version = "0.12", default-features=false, features = [ "proto-ipv4", "socket-tcp", "socket-icmp", "socket-udp", "medium-ethernet", "proto-dhcpv4", "socket-raw", "socket-dhcpv4"] }
 critical-section = "1.2"
 esp-bootloader-esp-idf = { version="0.5", features=["esp32c3"]}
+
+gc9a01-rs = { version = "0.4.2", features = ["graphics"] }
+display-interface = "0.5"
+display-interface-spi = "0.5"
+embedded-hal-bus = "0.3"
+embedded-graphics = "0.8"
