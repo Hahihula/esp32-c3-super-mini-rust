@@ -23,6 +23,11 @@ You can also copy the .cargo/config.toml and build.rs files from this repository
 - [blink](examples/blink.rs)
   `cargo espflash flash --release --example blink`
 
+- [pwm_led](examples/pwm_led.rs) — hardware PWM LED fading on GPIO8.
+  `cargo espflash flash --release --example pwm_led`
+
+  Wiring: LED=GPIO8.
+
 - [sk6812 led strip](examples/sk6812_rgbw_embassy.rs)
   `cargo espflash flash --release --example sk6812_rgbw_embassy`
 
